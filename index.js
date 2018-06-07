@@ -4,19 +4,25 @@ const fs = require('fs-extra')
 const level = require('level')
 const hypercore = require('hypercore')
 const crypto = require('hypercore/lib/crypto')
+const datEncoding = require('dat-encoding')
 
+const Replicator = require('./lib/replicator.js')
 const messages = require('./messages.js')
+
+module.exports = Corestore
 
 function Corestore (dir, opts) {
   if (!(this instanceof Corestore)) return new Corestore(dir, opts)
   opts = opts || {}
-  this.opts = opts
+  this._opts = opts
 
   this._metadata = level(p.join(dir, 'metadata'))
   this._root = p.join(dir, 'cores')
+  this._replicator = Replicator(this, opts.network)
 
   // Set in _load.
-  this._cores = {}
+  this.coresByKey = {}
+  this.coresByDKey = {}
 
   this.ready = new Promise((resolve, reject) => {
     this._load(err => {
@@ -35,20 +41,23 @@ Corestore.prototype._loadAll = async function (cb) {
   let keys = Object.keys(cores)
   for (var i = 0; i < keys.length; i++) {
     let key = keys[i]
-    let meta = cores[key]
+    let meta = this.coresByKey[key]
     await this._create(key, meta)
   }
 }
 
 Corestore.prototype._create = async function (key, opts) {
+  var self = this
+
   let keyString = ensureString(key)
   let core = hypercore(this._path(keyString), key, opts)
 
-  this._cores[keyString] = core
+  this._coresByKey[keyString] = core
 
   await new Promise((resolve, reject) => {
     core.ready(err => {
       if (err) return reject(err)
+      self._coresByDKey[ensureString(core.discoveryKey)] = core
       return resolve(core)
     })
   })
@@ -84,8 +93,8 @@ Corestore.prototype.get = async function (key, opts) {
   }
 
   if (key) {
-    let keyString = ensureString(string)
-    let existing = this._cores[keyString]
+    let keyString = ensureString(key)
+    let existing = this._coresByKey[keyString]
     if (existing) return existing
   } else {
     let { publicKey, privateKey } = crypto.keyPair()
@@ -117,7 +126,9 @@ Corestore.prototype.delete = async function (key) {
     await this._unseed(core)
   }
 
-  delete this._cores[key]
+  delete this._coresByKey[key]
+  delete this._coresByDKey[ensureString(core.discoveryKey)]
+
   await fs.remove(this._path(key))
   return true
 }
@@ -139,5 +150,5 @@ Corestore.prototype.list = async function (opts) {
 }
 
 function ensureString (key) {
-  if (typeof key === 'string') return key : return key.toString('hex')
+  return datEncoding.toStr(key)
 }
