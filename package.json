@@ -23,6 +23,7 @@
   "homepage": "https://github.com/andrewosh/corestore#readme",
   "devDependencies": {
     "hypercore": "^6.15.0",
+    "mkdirp": "^0.5.1",
     "standard": "^11.0.1",
     "tape": "^4.9.0"
   },
