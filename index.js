@@ -1,0 +1,143 @@
+const p = require('path')
+
+const fs = require('fs-extra')
+const level = require('level')
+const hypercore = require('hypercore')
+const crypto = require('hypercore/lib/crypto')
+
+const messages = require('./messages.js')
+
+function Corestore (dir, opts) {
+  if (!(this instanceof Corestore)) return new Corestore(dir, opts)
+  opts = opts || {}
+  this.opts = opts
+
+  this._metadata = level(p.join(dir, 'metadata'))
+  this._root = p.join(dir, 'cores')
+
+  // Set in _load.
+  this._cores = {}
+
+  this.ready = new Promise((resolve, reject) => {
+    this._load(err => {
+      if (err) return reject(err)
+      return resolve()
+    })
+  })
+}
+
+Corestore.prototype._path = function (key) {
+  return p.join(this._root, key)
+}
+
+Corestore.prototype._loadAll = async function (cb) {
+  let cores = await this.list()
+  let keys = Object.keys(cores)
+  for (var i = 0; i < keys.length; i++) {
+    let key = keys[i]
+    let meta = cores[key]
+    await this._create(key, meta)
+  }
+}
+
+Corestore.prototype._create = async function (key, opts) {
+  let keyString = ensureString(key)
+  let core = hypercore(this._path(keyString), key, opts)
+
+  this._cores[keyString] = core
+
+  await new Promise((resolve, reject) => {
+    core.ready(err => {
+      if (err) return reject(err)
+      return resolve(core)
+    })
+  })
+
+  if (opts.seed) {
+    await this._seed(core)
+  }
+}
+
+Corestore.prototype._seed = async function (core) {
+
+}
+
+Corestore.prototype._unseed = async function (core) {
+
+}
+
+Corestore.prototype.info = async function (key) {
+  key = ensureString(key)
+  try {
+    let value = await this._metadata.get(key)
+    return messages.Core.decode(value)
+  } catch (err) {
+    if (err.notFound) return null
+    throw err
+  }
+}
+
+Corestore.prototype.get = async function (key, opts) {
+  if (typeof key === 'object' && !(key instanceof Buffer)) {
+    opts = key
+    key = null
+  }
+
+  if (key) {
+    let keyString = ensureString(string)
+    let existing = this._cores[keyString]
+    if (existing) return existing
+  } else {
+    let { publicKey, privateKey } = crypto.keyPair()
+    opts.privateKey = privateKey
+    key = publicKey
+  }
+
+  let core = await this._create(key, opts)
+  opts.writable = core.writable
+
+  await this._metadata.put(ensureString(core.key), messages.Core.encode(opts))
+
+  return core
+}
+
+Corestore.prototype.update = async function (key, opts) {
+
+}
+
+Corestore.prototype.delete = async function (key) {
+  key = ensureString(key)
+  let info = await this.info(key)
+
+  if (!info) throw new Error('Cannot delete a nonexistent key')
+  let core = this._cores[key]
+  if (!core) throw new Error('Core was not initialized correctly')
+
+  if (info.seed) {
+    await this._unseed(core)
+  }
+
+  delete this._cores[key]
+  await fs.remove(this._path(key))
+  return true
+}
+
+Corestore.prototype.list = async function (opts) {
+  return new Promise((resolve, reject) => {
+    let result = {}
+    let stream = this._metadata.createReadStream()
+    stream.on('data', ({ key, value }) => {
+      result[key] = messages.Core.decode(value)
+    })
+    stream.on('end', () => {
+      return resolve(result)
+    })
+    stream.on('error', err => {
+      return reject(err)
+    })
+  })
+}
+
+function ensureString (key) {
+  if (typeof key === 'string') return key : return key.toString('hex')
+}

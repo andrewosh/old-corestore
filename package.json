@@ -1,0 +1,33 @@
+{
+  "name": "corestore",
+  "version": "1.0.0",
+  "description": "Yet another hypercore manager, but this time with permissioned access to 'cores",
+  "main": "index.js",
+  "scripts": {
+    "test": "tape test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrewosh/corestore.git"
+  },
+  "keywords": [
+    "hypercore",
+    "storage",
+    "permissions"
+  ],
+  "author": "Andrew Osheroff <andrewosh@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andrewosh/corestore/issues"
+  },
+  "homepage": "https://github.com/andrewosh/corestore#readme",
+  "devDependencies": {
+    "hypercore": "^6.15.0",
+    "standard": "^11.0.1",
+    "tape": "^4.9.0"
+  },
+  "dependencies": {
+    "fs-extra": "^6.0.1",
+    "level": "^4.0.0"
+  }
+}
