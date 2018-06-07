@@ -1,5 +1,4 @@
 const p = require('path')
-const assert = require('assert')
 
 const fs = require('fs-extra')
 const level = require('level')
@@ -18,6 +17,7 @@ function Corestore (dir, opts) {
   opts = opts || {}
   this._opts = opts
 
+  this.dir = dir
   this._root = p.join(dir, 'cores')
   this._replicator = Replicator(this, opts.network)
 
@@ -86,11 +86,11 @@ Corestore.prototype._create = async function (key, opts) {
 }
 
 Corestore.prototype._seed = async function (core) {
-
+  this._replicator.add(core)
 }
 
 Corestore.prototype._unseed = async function (core) {
-
+  this._replicator.remove(core)
 }
 
 Corestore.prototype.info = async function (key) {
@@ -171,6 +171,22 @@ Corestore.prototype.list = async function (opts) {
     })
     stream.on('error', err => {
       return reject(err)
+    })
+  })
+}
+
+Corestore.prototype.close = async function () {
+  let self = this
+
+  return new Promise((resolve, reject) => {
+    console.log('STOPPING REPLICATOR')
+    self._replicator.stop(err => {
+      console.log('STOPPED WITH ERR:', err)
+      if (err) return reject(err)
+      self._metadata.close(err => {
+        if (err) return reject(err)
+        return resolve()
+      })
     })
   })
 }
