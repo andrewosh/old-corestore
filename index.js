@@ -135,7 +135,18 @@ Corestore.prototype.get = async function (key, opts) {
 }
 
 Corestore.prototype.update = async function (key, opts) {
+  let keyString = ensureString(key)
+  let existing = this.coresByKey[keyString]
+  if (!existing) throw new Error('Updating a nonexistent core')
 
+  let info = await this.info(key)
+
+  if (opts.seed !== undefined && !opts.seed) {
+    await this._unseed(existing)
+  }
+
+  Object.assign(info, opts)
+  this._metadata.put(keyString, messages.Core.encode(info))
 }
 
 Corestore.prototype.delete = async function (key) {
