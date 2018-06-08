@@ -161,11 +161,19 @@ Corestore.prototype.delete = async function (key) {
     await this._unseed(core)
   }
 
-  delete this.coresByKey[key]
-  delete this.coresByDKey[ensureString(core.discoveryKey)]
-
-  await fs.remove(this._path(key))
-  return true
+  return new Promise(async (resolve, reject) => {
+    this._metadata.del(key, async err => {
+      if (err) return reject(err)
+      delete this.coresByKey[key]
+      delete this.coresByDKey[ensureString(core.discoveryKey)]
+      try {
+        await fs.remove(this._path(key))
+      } catch (err) {
+        return reject(err)
+      }
+      return resolve()
+    })
+  })
 }
 
 Corestore.prototype.list = async function (opts) {

@@ -96,7 +96,28 @@ test('should stop seeding', async t => {
   }, 100)
 })
 
-test.skip('should delete and unseed', async t => {
+test('should delete and unseed', async t => {
+  let s1 = await create(idx++)
+  let s2 = await create(idx++)
+
+  let core1 = await s1.get({ valueEncoding: 'utf-8' })
+  await append(core1, 'hello!')
+
+  let core2 = await s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let value = await get(core2, 0)
+
+  // Delay for peer discovery + replication.
+  setTimeout(async () => {
+    t.same(value, 'hello!')
+    await s1.delete(core1.key)
+    setTimeout(async () => {
+      t.same(core2.peers.length, 0)
+      let info = await s1.info(core1.key)
+      t.same(info, null)
+      await cleanup(s1, s2)
+      t.end()
+    }, 100)
+  }, 100)
 })
 
 test('teardown', t => {
