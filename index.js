@@ -52,7 +52,7 @@ Corestore.prototype._loadAll = async function (cb) {
     let keys = Object.keys(cores)
     for (var i = 0; i < keys.length; i++) {
       let key = keys[i]
-      let meta = this.coresByKey[key]
+      let meta = cores[key]
       await this._create(key, meta)
     }
     return cb()
@@ -122,8 +122,9 @@ Corestore.prototype.get = async function (key, opts) {
     let existing = this.coresByKey[keyString]
     if (existing) return existing
   } else {
-    let { publicKey, privateKey } = crypto.keyPair()
-    opts.privateKey = privateKey
+    let { publicKey, secretKey } = crypto.keyPair()
+    opts.secretKey = secretKey
+    opts.writable = true
     key = publicKey
   }
 
