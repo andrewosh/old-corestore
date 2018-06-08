@@ -97,9 +97,7 @@ Corestore.prototype.info = async function (key) {
   key = ensureString(key)
   try {
     let value = await this._metadata.get(key)
-    console.log('VALUE:', value, 'at key:', key)
     let decoded = messages.Core.decode(value)
-    console.log('DECODED:', decoded)
     return decoded
   } catch (err) {
     if (err.notFound) return null
@@ -113,8 +111,8 @@ Corestore.prototype.get = async function (key, opts) {
     key = null
   }
   opts = opts || {}
-  opts.seed = opts.seed || true
-  opts.sparse = opts.sparse || true
+  opts.seed = opts.seed !== undefined ? opts.seed : true
+  opts.sparse = opts.sparse !== undefined ? opts.sparse : true
   if (!key) opts.valueEncoding = opts.valueEncoding || 'binary'
 
   if (key) {
@@ -131,7 +129,6 @@ Corestore.prototype.get = async function (key, opts) {
   let core = await this._create(key, opts)
   opts.writable = core.writable
 
-  console.log('PUTTING VALUE:', opts, 'at key:', ensureString(core.key))
   await this._metadata.put(ensureString(core.key), messages.Core.encode(opts))
 
   return core
@@ -180,9 +177,7 @@ Corestore.prototype.close = async function () {
   let self = this
 
   return new Promise((resolve, reject) => {
-    console.log('STOPPING REPLICATOR')
     self._replicator.stop(err => {
-      console.log('STOPPED WITH ERR:', err)
       if (err) return reject(err)
       self._metadata.close(err => {
         if (err) return reject(err)

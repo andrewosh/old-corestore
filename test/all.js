@@ -57,7 +57,22 @@ test('can create and replicate a core', async t => {
   }, 100)
 })
 
-test.skip('should not seed if seed is false', t => {
+test('should not seed if seed is false', async t => {
+  let s1 = await create(idx++)
+  let s2 = await create(idx++)
+
+  let core1 = await s1.get({ valueEncoding: 'utf-8', seed: false })
+  await append(core1, 'hello!')
+
+  let core2 = await s2.get(core1.key, { valueEncoding: 'utf-8' })
+
+  // Delay for peer discovery.
+  setTimeout(async () => {
+    console.log('PEERS:', core2.peers)
+    t.same(core2.peers.length, 0)
+    await cleanup(s1, s2)
+    t.end()
+  }, 100)
 })
 
 test.skip('should stop seeding', t => {
