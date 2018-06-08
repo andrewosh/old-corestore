@@ -13,7 +13,7 @@ test('setup', t => {
 })
 
 test('can create and get info for a core', async t => {
-  let s = Store(p.join(TEST_DIR, 's1'))
+  let s = create()
   await s.ready
   let core = await s.get()
   let info = await s.info(core.key)
@@ -25,13 +25,14 @@ test('can create and get info for a core', async t => {
 })
 
 test('can create and get info for a core, across restarts', async t => {
-  let s = Store(p.join(TEST_DIR, 's1'))
+  let s = create()
   await s.ready
   let core = await s.get()
   await s.close()
 
-  s = Store(p.join(TEST_DIR, 's1'))
+  s = create()
   await s.ready
+  core = await s.get()
   let info = await s.info(core.key)
   t.same(core.sparse, info.sparse)
   t.same(core.writable, info.writable)
@@ -54,10 +55,15 @@ test('teardown', t => {
   t.end()
 })
 
+let idx = 0
 async function cleanup () {
   for (var i = 0; i < arguments.length; i++) {
     let store = arguments[i]
     await store.close()
     await fs.remove(store.dir)
   }
+}
+
+function create () {
+  return Store(p.join(TEST_DIR, `s${idx}`), { network: { port: 4000 + idx++ } })
 }
