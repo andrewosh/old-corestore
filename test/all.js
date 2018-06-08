@@ -134,7 +134,6 @@ async function cleanup () {
 }
 
 async function create (idx) {
-  console.log('CREATING WITH IDX:', idx)
   let store = Store(p.join(TEST_DIR, `s${idx}`), { network: { port: 4000 + idx } })
   await store.ready
   return store
