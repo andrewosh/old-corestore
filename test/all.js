@@ -120,6 +120,21 @@ test('should delete and unseed', async t => {
   }, 100)
 })
 
+test('should work without networking', async t => {
+  let s = await create(idx++, {
+    network: {
+      disable: true
+    }
+  })
+  let core = await s.get()
+  let info = await s.info(core.key)
+  t.same(core.sparse, info.sparse)
+  t.same(core.writable, info.writable)
+
+  await cleanup(s)
+  t.end()
+})
+
 test('teardown', t => {
   fs.remove(TEST_DIR)
   t.end()

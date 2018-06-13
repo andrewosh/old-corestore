@@ -19,7 +19,12 @@ function Corestore (dir, opts) {
 
   this.dir = dir
   this._root = p.join(dir, 'cores')
-  this._replicator = Replicator(this, opts.network)
+
+  if (!(opts.network && opts.network.disable)) {
+    this._replicator = Replicator(this, opts.network)
+  } else {
+    this._noNetwork = true
+  }
 
   // Set in ready.
   this._metadata = null
@@ -61,36 +66,48 @@ Corestore.prototype._loadAll = async function (cb) {
   }
 }
 
-Corestore.prototype._create = async function (key, opts) {
+Corestore.prototype._create = function (key, opts) {
   opts = opts || {}
-  var self = this
 
   let keyString = ensureString(key)
   let core = hypercore(this._path(keyString), key, opts)
 
   this.coresByKey[keyString] = core
 
-  await new Promise((resolve, reject) => {
-    core.ready(err => {
-      if (err) return reject(err)
-      self.coresByDKey[ensureString(core.discoveryKey)] = core
-      return resolve(core)
+  let ready = core.ready.bind(core)
+  core.ready = (cb) => {
+    return new Promise((resolve, reject) => {
+      ready(err => {
+        if (err) return reject(err)
+        this.coresByDKey[ensureString(core.discoveryKey)] = core
+        this._metadata.put(ensureString(core.key), messages.Core.encode(opts), err => {
+          if (err) return reject(err)
+          if (opts.seed) {
+            this._seed(core)
+          }
+          return resolve()
+        })
+      })
+    }).then(() => {
+      if (cb) return cb()
+    }).catch(err => {
+      if (cb) return cb(err)
     })
-  })
-
-  if (opts.seed) {
-    await this._seed(core)
   }
 
   return core
 }
 
-Corestore.prototype._seed = async function (core) {
-  this._replicator.add(core)
+Corestore.prototype._seed = function (core) {
+  if (!this._noNetwork) {
+    this._replicator.add(core)
+  }
 }
 
-Corestore.prototype._unseed = async function (core) {
-  this._replicator.remove(core)
+Corestore.prototype._unseed = function (core) {
+  if (!this._noNetwork) {
+    this._replicator.remove(core)
+  }
 }
 
 Corestore.prototype.info = async function (key) {
@@ -105,7 +122,7 @@ Corestore.prototype.info = async function (key) {
   }
 }
 
-Corestore.prototype.get = async function (key, opts) {
+Corestore.prototype.get = function (key, opts) {
   if (typeof key === 'object' && !(key instanceof Buffer)) {
     opts = key
     key = null
@@ -126,10 +143,8 @@ Corestore.prototype.get = async function (key, opts) {
     key = publicKey
   }
 
-  let core = await this._create(key, opts)
+  let core = this._create(key, opts)
   opts.writable = core.writable
-
-  await this._metadata.put(ensureString(core.key), messages.Core.encode(opts))
 
   return core
 }
@@ -186,16 +201,9 @@ Corestore.prototype.list = async function (opts) {
 
 Corestore.prototype.close = async function () {
   let self = this
-
-  return new Promise((resolve, reject) => {
-    self._replicator.stop(err => {
-      if (err) return reject(err)
-      self._metadata.close(err => {
-        if (err) return reject(err)
-        return resolve()
-      })
-    })
-  })
+  let tasks = [self._metadata.close()]
+  if (self._replicator) tasks.push(self._replicator.stop())
+  return Promise.all(tasks)
 }
 
 function ensureString (key) {
