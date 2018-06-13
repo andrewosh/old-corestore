@@ -16,7 +16,10 @@ test('setup', t => {
 
 test('can create and get info for a core', async t => {
   let s = await create(idx++)
-  let core = await s.get()
+
+  let core = s.get()
+  await core.ready()
+
   let info = await s.info(core.key)
   t.same(core.sparse, info.sparse)
   t.same(core.writable, info.writable)
@@ -27,7 +30,10 @@ test('can create and get info for a core', async t => {
 
 test('can create and get info for a core, across restarts', async t => {
   let s = await create(idx)
-  let core = await s.get()
+
+  let core = s.get()
+  await core.ready()
+
   await s.close()
 
   s = await create(idx++)
@@ -43,10 +49,12 @@ test('can create and replicate a core', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = await s1.get({ valueEncoding: 'utf-8' })
+  let core1 = s1.get({ valueEncoding: 'utf-8' })
+  await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = await s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  await core2.ready()
   let block = await get(core2, 0)
 
   // Delay to let the replication propagate.
@@ -61,10 +69,12 @@ test('should not seed if seed is false', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = await s1.get({ valueEncoding: 'utf-8', seed: false })
+  let core1 = s1.get({ valueEncoding: 'utf-8', seed: false })
+  await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = await s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  await core2.ready()
 
   // Delay for peer discovery.
   setTimeout(async () => {
@@ -78,10 +88,12 @@ test('should stop seeding', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = await s1.get({ valueEncoding: 'utf-8' })
+  let core1 = s1.get({ valueEncoding: 'utf-8' })
+  await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = await s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  await core2.ready()
   let value = await get(core2, 0)
 
   // Delay for peer discovery + replication.
@@ -100,10 +112,12 @@ test('should delete and unseed', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = await s1.get({ valueEncoding: 'utf-8' })
+  let core1 = s1.get({ valueEncoding: 'utf-8' })
+  await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = await s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  await core2.ready()
   let value = await get(core2, 0)
 
   // Delay for peer discovery + replication.
@@ -126,7 +140,10 @@ test('should work without networking', async t => {
       disable: true
     }
   })
-  let core = await s.get()
+
+  let core = s.get()
+  await core.ready()
+
   let info = await s.info(core.key)
   t.same(core.sparse, info.sparse)
   t.same(core.writable, info.writable)
