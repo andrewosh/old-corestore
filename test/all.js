@@ -65,6 +65,25 @@ test('can create and replicate a core', async t => {
   }, 100)
 })
 
+test('can create a core that isnt replicating', async t => {
+  let s1 = await create(idx++, {
+    network: {
+      disable: true
+    }
+  })
+  let s2 = await create(idx++)
+
+  let core1 = s1.get()
+  await core1.ready()
+
+  let core2 = s2.get(core1.key)
+  await core2.ready()
+
+  t.same(core2.key, core1.key)
+  await cleanup(s1, s2)
+  t.end()
+})
+
 test('should not seed if seed is false', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
@@ -167,7 +186,7 @@ async function cleanup () {
 
 async function create (idx) {
   let store = Store(p.join(TEST_DIR, `s${idx}`), { network: { port: 4000 + idx } })
-  await store.ready
+  await store.ready()
   return store
 }
 

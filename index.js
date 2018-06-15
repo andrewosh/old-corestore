@@ -32,37 +32,43 @@ function Corestore (dir, opts) {
   this.coresByDKey = {}
 
   var self = this
-  this.ready = new Promise((resolve, reject) => {
-    mkdirp(dir, err => {
+  this._ready = new Promise(async (resolve, reject) => {
+    mkdirp(dir, async err => {
       if (err) return reject(err)
       self._metadata = level(p.join(dir, 'metadata'), {
         keyEncoding: 'utf-8',
         valueEncoding: 'binary'
       })
-      self._loadAll(err => {
-        if (err) return reject(err)
+      try {
+        await self._loadAll()
         return resolve()
-      })
+      } catch (err) {
+        return reject(err)
+      }
     })
   })
+
+  this.ready = cb => {
+    if (!cb) return this._ready
+    this._ready.then(() => {
+      return cb()
+    }).catch(err => {
+      return cb(err)
+    })
+  }
 }
 
 Corestore.prototype._path = function (key) {
   return p.join(this._root, key)
 }
 
-Corestore.prototype._loadAll = async function (cb) {
-  try {
-    let cores = await this.list()
-    let keys = Object.keys(cores)
-    for (var i = 0; i < keys.length; i++) {
-      let key = keys[i]
-      let meta = cores[key]
-      await this._create(key, meta)
-    }
-    return cb()
-  } catch (err) {
-    return cb(err)
+Corestore.prototype._loadAll = async function () {
+  let cores = await this.list()
+  let keys = Object.keys(cores)
+  for (var i = 0; i < keys.length; i++) {
+    let key = keys[i]
+    let meta = cores[key]
+    await this._create(key, meta)
   }
 }
 
