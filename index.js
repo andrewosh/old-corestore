@@ -31,16 +31,18 @@ function Corestore (dir, opts) {
   this.coresByKey = {}
   this.coresByDKey = {}
 
-  var self = this
+  this._opened = false
+
   this._ready = new Promise(async (resolve, reject) => {
     mkdirp(dir, async err => {
       if (err) return reject(err)
-      self._metadata = level(p.join(dir, 'metadata'), {
+      this._metadata = level(p.join(dir, 'metadata'), {
         keyEncoding: 'utf-8',
         valueEncoding: 'binary'
       })
       try {
-        await self._loadAll()
+        await this._loadAll()
+        this._opened = true
         return resolve()
       } catch (err) {
         return reject(err)
@@ -207,6 +209,7 @@ Corestore.prototype.list = async function (opts) {
 
 Corestore.prototype.close = async function () {
   let self = this
+  if (!this._opened) return
   let tasks = [self._metadata.close()]
   if (self._replicator) tasks.push(self._replicator.stop())
   return Promise.all(tasks)
