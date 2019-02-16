@@ -22,7 +22,6 @@
   },
   "homepage": "https://github.com/andrewosh/corestore#readme",
   "devDependencies": {
-    "hypercore": "^6.15.0",
     "mkdirp": "^0.5.1",
     "standard": "^11.0.1",
     "tape": "^4.9.0"
@@ -33,6 +32,7 @@
     "debug": "^3.1.0",
     "discovery-swarm": "^5.1.1",
     "fs-extra": "^6.0.1",
+    "hypercore": "^6.25.0",
     "hypercore-protocol": "^6.6.4",
     "level": "^4.0.0"
   }
