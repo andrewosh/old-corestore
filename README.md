@@ -3,12 +3,12 @@ Manages and seeds a library of Hypercores.
 
 Networking code lightly modified from [Beaker's implementation](https://github.com/beakerbrowser/beaker-core/blob/master/dat/daemon/index.js)
 
-### Installation
+## Installation
 ```
 npm i corestore --save
 ```
 
-### Usage
+## Usage
 ```js
 let store = corestore('my-storage-dir')
 await store.ready()
@@ -37,7 +37,7 @@ await store.info(core.key)
 await store.close()
 ```
 
-### API
+## API
 #### `async get([key], [opts])`
 Either load a hypercore by key, or create a new one.
 
