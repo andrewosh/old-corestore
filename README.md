@@ -79,5 +79,5 @@ Unseed and delete the specified hypercore, if it's currently being stored.
 
 Throws if the key has not been previously stored.
 
-### License
+## License
 MIT
