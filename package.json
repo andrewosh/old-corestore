@@ -1,6 +1,6 @@
 {
   "name": "corestore",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Yet another hypercore manager, but this time with permissioned access to 'cores",
   "main": "index.js",
   "scripts": {
