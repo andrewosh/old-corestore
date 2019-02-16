@@ -1,4 +1,6 @@
 # corestore
+[![Build Status](https://travis-ci.org/andrewosh/corestore.svg?branch=master)](https://travis-ci.org/andrewosh/corestore)
+
 Manages and seeds a library of Hypercores.
 
 Networking code lightly modified from [Beaker's implementation](https://github.com/beakerbrowser/beaker-core/blob/master/dat/daemon/index.js)
