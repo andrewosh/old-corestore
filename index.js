@@ -191,12 +191,12 @@ Corestore.prototype.delete = async function (key) {
   delete this.coresByDKey[ensureString(core.discoveryKey)]
 }
 
-Corestore.prototype.list = async function (opts) {
+Corestore.prototype.list = async function () {
   return new Promise((resolve, reject) => {
-    let result = {}
+    let result = new Map()
     let stream = this._metadata.createReadStream()
     stream.on('data', ({ key, value }) => {
-      result[key] = messages.Core.decode(value)
+      result.set(key, messages.Core.decode(value))
     })
     stream.on('end', () => {
       return resolve(result)

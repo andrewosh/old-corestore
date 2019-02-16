@@ -171,6 +171,28 @@ test('should work without networking', async t => {
   t.end()
 })
 
+test('should list all cores', async t => {
+  let s = await create(idx++, {
+    network: {
+      disable: true
+    }
+  })
+
+  let core1 = s.get()
+  let core2 = s.get()
+  let core3 = s.get()
+  await Promise.all([core1.ready(), core2.ready(), core3.ready()])
+
+  let l = await s.list()
+  t.same(l.size, 3)
+  t.true(l.get(core1.key.toString('hex')))
+  t.true(l.get(core2.key.toString('hex')))
+  t.true(l.get(core3.key.toString('hex')))
+
+  await cleanup(s)
+  t.end()
+})
+
 test('teardown', t => {
   fs.remove(TEST_DIR)
   t.end()
