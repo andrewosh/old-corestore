@@ -1,7 +1,7 @@
 # corestore
 Manages and seeds a library of Hypercores.
 
-Networking code lightly modified from [Beaker](https://github.com/beakerbrowser/beaker)
+Networking code lightly modified from [Beaker's implementation](https://github.com/beakerbrowser/beaker-core/blob/master/dat/daemon/index.js)
 
 ### Installation
 ```
