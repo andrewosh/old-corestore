@@ -34,7 +34,8 @@ function Corestore (dir, opts) {
   this.coresByKey.on('evict', ({ value: core }) => {
     let dkey = ensureString(core.discoveryKey)
     this.coresByDKey.remove(dkey)
-    core.close()
+    // TODO: A core shouldn't be closed on eviction, but is any cleanup necessary here?
+    // core.close()
   })
 
   this._opened = false
