@@ -47,7 +47,6 @@ function Corestore (dir, opts) {
         valueEncoding: 'binary'
       })
       try {
-        await this._loadAll()
         this._opened = true
         return resolve()
       } catch (err) {
@@ -70,16 +69,6 @@ Corestore.prototype._path = function (key) {
   return p.join(this._root, key)
 }
 
-Corestore.prototype._loadAll = async function () {
-  let cores = await this.list()
-  let keys = Object.keys(cores)
-  for (var i = 0; i < keys.length; i++) {
-    let key = keys[i]
-    let meta = cores[key]
-    await this._create(key, meta)
-  }
-}
-
 Corestore.prototype._create = function (key, opts) {
   opts = opts || {}
 
@@ -94,7 +83,14 @@ Corestore.prototype._create = function (key, opts) {
       ready(err => {
         if (err) return reject(err)
         this.coresByDKey.set(ensureString(core.discoveryKey), core)
-        this._metadata.put(ensureString(core.key), messages.Core.encode(opts), err => {
+        opts.key = core.key
+        let info = messages.Core.encode(opts)
+        let key = 'key/' + ensureString(core.key)
+        let batch = [
+          { type: 'put', key, value: info }
+        ]
+        if (opts.name) batch.push({ type: 'put', key: 'name/' + opts.name, value: key })
+        this._metadata.batch(batch, err => {
           if (err) return reject(err)
           if (opts.seed) {
             this._seed(core)
@@ -124,12 +120,13 @@ Corestore.prototype._unseed = function (core) {
   }
 }
 
-Corestore.prototype.info = async function (key) {
-  key = ensureString(key)
+Corestore.prototype.info = async function (key, opts) {
+  opts = opts || {}
+  key = opts.name ? 'name/' + key : 'key/' + ensureString(key)
   try {
     let value = await this._metadata.get(key)
-    let decoded = messages.Core.decode(value)
-    return decoded
+    if (opts.name) value = await this._metadata.get(value)
+    return messages.Core.decode(value)
   } catch (err) {
     if (err.notFound) return null
     throw err
@@ -163,6 +160,16 @@ Corestore.prototype.get = function (key, opts) {
   return core
 }
 
+Corestore.prototype.getByName = async function (name, opts) {
+  let info = await this.info(name, { name: true })
+  if (!info) return null
+
+  // Since the function is async anyway, might as well ready.
+  let core = this.get(info.key, opts)
+  await core.ready()
+  return core
+}
+
 Corestore.prototype.update = async function (key, opts) {
   let keyString = ensureString(key)
   let existing = this.coresByKey.get(keyString)
@@ -175,7 +182,7 @@ Corestore.prototype.update = async function (key, opts) {
   }
 
   Object.assign(info, opts)
-  this._metadata.put(keyString, messages.Core.encode(info))
+  this._metadata.put('key/' + keyString, messages.Core.encode(info))
 }
 
 Corestore.prototype.delete = async function (key) {
@@ -186,23 +193,38 @@ Corestore.prototype.delete = async function (key) {
   let core = this.coresByKey.get(key)
   if (!core) throw new Error('Core was not initialized correctly')
 
-  if (info.seed) {
+  if (info.seed && !this._noNetwork) {
     await this._unseed(core)
   }
 
-  await this._metadata.del(key)
-  await fs.remove(this._path(key))
+  return new Promise(async (resolve, reject) => {
+    core.close(async err => {
+      if (err) return reject(err)
 
-  this.coresByKey.remove(key)
-  this.coresByDKey.remove(ensureString(core.discoveryKey))
+      try {
+        let batch = [
+          { type: 'del', key: 'key/' + key }
+        ]
+        if (info.name) batch.push({ type: 'del', key: 'name/' + info.name })
+        await this._metadata.batch(batch)
+        await fs.remove(this._path(key))
+
+        this.coresByKey.remove(key)
+        this.coresByDKey.remove(ensureString(core.discoveryKey))
+        return resolve()
+      } catch (err) {
+        return reject(err)
+      }
+    })
+  })
 }
 
 Corestore.prototype.list = async function () {
   return new Promise((resolve, reject) => {
     let result = new Map()
-    let stream = this._metadata.createReadStream()
+    let stream = this._metadata.createReadStream({ lt: 'name/' })
     stream.on('data', ({ key, value }) => {
-      result.set(key, messages.Core.decode(value))
+      result.set(key.slice(4), messages.Core.decode(value))
     })
     stream.on('end', () => {
       return resolve(result)

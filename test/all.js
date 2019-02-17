@@ -193,6 +193,44 @@ test('should list all cores', async t => {
   t.end()
 })
 
+test('should get a core by name', async t => {
+  let s = await create(idx++, {
+    network: {
+      disable: true
+    }
+  })
+
+  let core = s.get({ name: 'hello' })
+  await core.ready()
+
+  let info = await s.info('hello', { name: true })
+  t.same(info.name, 'hello')
+
+  let core2 = await s.getByName('hello')
+  t.true(core2.key.equals(core.key))
+
+  await cleanup(s)
+  t.end()
+})
+
+test('should delete both records for a named core', async t => {
+  let s = await create(idx++, {
+    network: {
+      disable: true
+    }
+  })
+
+  let core = s.get({ name: 'hello' })
+  await core.ready()
+
+  await s.delete(core.key)
+  let key = await s.getByName('hello')
+  t.false(key)
+
+  await cleanup(s)
+  t.end()
+})
+
 test('teardown', t => {
   fs.remove(TEST_DIR)
   t.end()
@@ -206,8 +244,12 @@ async function cleanup () {
   }
 }
 
-async function create (idx) {
-  let store = Store(p.join(TEST_DIR, `s${idx}`), { network: { port: 4000 + idx } })
+async function create (idx, opts) {
+  opts = {
+    network: { port: 4000 + idx },
+    ...opts
+  }
+  let store = Store(p.join(TEST_DIR, `s${idx}`), opts)
   await store.ready()
   return store
 }
