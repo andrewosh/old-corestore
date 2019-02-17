@@ -34,6 +34,7 @@
     "fs-extra": "^6.0.1",
     "hypercore": "^6.25.0",
     "hypercore-protocol": "^6.6.4",
-    "level": "^4.0.0"
+    "level": "^4.0.0",
+    "lru": "^3.1.0"
   }
 }

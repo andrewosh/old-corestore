@@ -6,6 +6,7 @@ const hypercore = require('hypercore')
 const crypto = require('hypercore/lib/crypto')
 const datEncoding = require('dat-encoding')
 const mkdirp = require('mkdirp')
+const LRU = require('lru')
 
 const Replicator = require('./lib/replicator.js')
 const messages = require('./lib/messages.js')
@@ -28,8 +29,13 @@ function Corestore (dir, opts) {
 
   // Set in ready.
   this._metadata = null
-  this.coresByKey = {}
-  this.coresByDKey = {}
+  this.coresByKey = new LRU(opts.cacheSize || 50)
+  this.coresByDKey = new LRU(opts.cacheSize || 50)
+  this.coresByKey.on('evict', ({ value: core }) => {
+    let dkey = ensureString(core.discoveryKey)
+    this.coresByDKey.remove(dkey)
+    core.close()
+  })
 
   this._opened = false
 
@@ -80,14 +86,14 @@ Corestore.prototype._create = function (key, opts) {
   let keyString = ensureString(key)
   let core = hypercore(this._path(keyString), key, opts)
 
-  this.coresByKey[keyString] = core
+  this.coresByKey.set(keyString, core)
 
   let ready = core.ready.bind(core)
   core.ready = (cb) => {
     return new Promise((resolve, reject) => {
       ready(err => {
         if (err) return reject(err)
-        this.coresByDKey[ensureString(core.discoveryKey)] = core
+        this.coresByDKey.set(ensureString(core.discoveryKey), core)
         this._metadata.put(ensureString(core.key), messages.Core.encode(opts), err => {
           if (err) return reject(err)
           if (opts.seed) {
@@ -142,7 +148,7 @@ Corestore.prototype.get = function (key, opts) {
 
   if (key) {
     let keyString = ensureString(key)
-    let existing = this.coresByKey[keyString]
+    let existing = this.coresByKey.get(keyString)
     if (existing) return existing
   } else {
     let { publicKey, secretKey } = crypto.keyPair()
@@ -159,7 +165,7 @@ Corestore.prototype.get = function (key, opts) {
 
 Corestore.prototype.update = async function (key, opts) {
   let keyString = ensureString(key)
-  let existing = this.coresByKey[keyString]
+  let existing = this.coresByKey.get(keyString)
   if (!existing) throw new Error('Updating a nonexistent core')
 
   let info = await this.info(key)
@@ -177,7 +183,7 @@ Corestore.prototype.delete = async function (key) {
   let info = await this.info(key)
 
   if (!info) throw new Error('Cannot delete a nonexistent key')
-  let core = this.coresByKey[key]
+  let core = this.coresByKey.get(key)
   if (!core) throw new Error('Core was not initialized correctly')
 
   if (info.seed) {
@@ -187,8 +193,8 @@ Corestore.prototype.delete = async function (key) {
   await this._metadata.del(key)
   await fs.remove(this._path(key))
 
-  delete this.coresByKey[key]
-  delete this.coresByDKey[ensureString(core.discoveryKey)]
+  this.coresByKey.remove(key)
+  this.coresByDKey.remove(ensureString(core.discoveryKey))
 }
 
 Corestore.prototype.list = async function () {
