@@ -13,9 +13,8 @@ const messages = require('./lib/messages.js')
 
 module.exports = Corestore
 
-function Corestore (dir, opts) {
+function Corestore (dir, opts = {}) {
   if (!(this instanceof Corestore)) return new Corestore(dir, opts)
-  opts = opts || {}
   this._opts = opts
 
   this.dir = dir
@@ -70,9 +69,7 @@ Corestore.prototype._path = function (key) {
   return p.join(this._root, key)
 }
 
-Corestore.prototype._create = function (key, opts) {
-  opts = opts || {}
-
+Corestore.prototype._create = function (key, opts = {}) {
   let keyString = ensureString(key)
   let core = hypercore(this._path(keyString), key, opts)
 
@@ -121,8 +118,7 @@ Corestore.prototype._unseed = function (core) {
   }
 }
 
-Corestore.prototype.info = async function (key, opts) {
-  opts = opts || {}
+Corestore.prototype.info = async function (key, opts = {}) {
   key = opts.name ? 'name/' + key : 'key/' + ensureString(key)
   try {
     let value = await this._metadata.get(key)
@@ -134,12 +130,11 @@ Corestore.prototype.info = async function (key, opts) {
   }
 }
 
-Corestore.prototype.get = function (key, opts) {
+Corestore.prototype.get = function (key, opts = {}) {
   if (typeof key === 'object' && !(key instanceof Buffer)) {
     opts = key
     key = null
   }
-  opts = opts || {}
   opts.seed = opts.seed !== undefined ? opts.seed : true
   opts.sparse = opts.sparse !== undefined ? opts.sparse : true
   if (!key) opts.valueEncoding = opts.valueEncoding || 'binary'
@@ -149,7 +144,7 @@ Corestore.prototype.get = function (key, opts) {
     let existing = this.coresByKey.get(keyString)
     if (existing) return existing
   } else {
-    let { publicKey, secretKey } = crypto.keyPair()
+    let { publicKey, secretKey } = opts.keyPair || crypto.keyPair()
     opts.secretKey = secretKey
     opts.writable = true
     key = publicKey

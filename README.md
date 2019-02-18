@@ -52,7 +52,8 @@ Opts can contain:
   seed: bool,
   sparse: bool,
   name: string,
-  description: string
+  description: string,
+  keyPair: { publicKey, secretKey }
 }
 ```
 
