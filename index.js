@@ -130,11 +130,12 @@ Corestore.prototype.info = async function (key, opts = {}) {
   }
 }
 
-Corestore.prototype.get = function (key, opts = {}) {
+Corestore.prototype.get = function (key, opts) {
   if (typeof key === 'object' && !(key instanceof Buffer)) {
     opts = key
     key = null
   }
+  opts = opts || {}
   opts.seed = opts.seed !== undefined ? opts.seed : true
   opts.sparse = opts.sparse !== undefined ? opts.sparse : true
   if (!key) opts.valueEncoding = opts.valueEncoding || 'binary'
