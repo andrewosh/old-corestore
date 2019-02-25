@@ -231,6 +231,37 @@ test('should delete both records for a named core', async t => {
   t.end()
 })
 
+test('should seed stored keys without inflating cores', async t => {
+  let s1 = await create(idx)
+
+  let keys = []
+
+  for (let i = 0; i < 10; i++) {
+    let core = s1.get()
+    await core.ready()
+    await append(core, core.key)
+    keys.push(core.key)
+    await close(core)
+  }
+
+  await s1.close()
+  s1 = await create(idx++)
+
+  t.same(s1.coresByKey.size, 0)
+
+  let s2 = await create(idx++)
+  for (let i = 0; i < keys.length; i++) {
+    let core = s2.get(keys[i])
+    await core.ready()
+    let val = await get(core, 0)
+    t.same(val, keys[i])
+    t.same(s1.coresByKey.size, i + 1)
+  }
+
+  await cleanup(s1, s2)
+  t.end()
+})
+
 test('teardown', t => {
   fs.remove(TEST_DIR)
   t.end()
@@ -268,6 +299,15 @@ async function get (core, idx) {
     core.get(idx, (err, value) => {
       if (err) return reject(err)
       return resolve(value)
+    })
+  })
+}
+
+async function close (core) {
+  return new Promise((resolve, reject) => {
+    core.close(err => {
+      if (err) return reject(err)
+      return resolve()
     })
   })
 }
