@@ -4,45 +4,26 @@ const level = require('level')
 const sub = require('subleveldown')
 const prefixer = require('sublevel-prefixer')
 const crypto = require('hypercore/lib/crypto')
+const hypercore = require('hypercore')
 const datEncoding = require('dat-encoding')
 const messages = require('./lib/messages.js')
+const Replicator = require('./lib/replicator.js')
 
 const KEY_PREFIX = 'key'
 const DKEY_PREFIX = 'dkey'
 const NAME_PREFIX = 'name'
 const prefix = prefixer()
 
+function defaultFactory (path, key, opts) {
+  return hypercore(opts.storage(path), key, opts)
+}
+
 module.exports = Corestore
 
-// Default handlers.
-const Replicator = require('./lib/replicator.js')
-const Hypercore = require('hypercore')
-
-const raf = require('random-access-file')
-const mkdirp = require('mkdirp')
-const fs = require('fs-extra')
-
-const defaultStorage = {
-  storage (path) {
-    return nestStorage(raf, path)
-  },
-  async prepare (path) {
-    return new Promise((resolve, reject) => {
-      mkdirp(path, err => err ? reject(err) : resolve())
-    })
-  },
-  async delete (path) {
-    return fs.remove(path)
+Corestore.withDefaults = function (defaultOpts) {
+  return function (dir, opts) {
+    return Corestore(dir, { ...defaultOpts, ...opts })
   }
-}
-
-function defaultReplicator (store, opts) {
-  return Replicator(store, opts)
-}
-
-function defaultFactory (path, key, opts) {
-  const storage = opts.storage || defaultStorage(path)
-  return Hypercore(storage, key, opts)
 }
 
 function Corestore (dir, opts = {}) {
@@ -60,14 +41,14 @@ function Corestore (dir, opts = {}) {
   this.factory = opts.factory || defaultFactory
 
   // Default: random-access-file
-  this._storageHandlers = opts.storage ? wrapStorage(opts.storage) : defaultStorage
-
-  this.storage = this._storageHandlers.storage
+  if (!opts.storage) throw new Error('storage is required')
+  this._storageHandlers = wrapStorage(opts.storage)
+  this.storage = this._storageHandlers.create
 
   // Default: discovery-swarm replicator
   if (!(opts.network && opts.network.disable)) {
-    const replicator = opts.replicator || defaultReplicator
-    this._replicator = replicator(this, opts.network)
+    if (!opts.swarm) throw new Error('swarm is required if network is not disabled')
+    this._replicator = Replicator(this, opts.swarm, opts.network)
   } else {
     this._noNetwork = true
   }
@@ -366,14 +347,6 @@ function ensureString (key) {
 
 function wrapStorage (storage) {
   if (typeof storage === 'object') return storage
-  if (typeof storage === 'function') return { storage }
+  if (typeof storage === 'function') return { create: storage }
   throw new Error('Storage should be a function or a string.')
-}
-
-function nestStorage (storage, ...prefixes) {
-  return function (name, opts) {
-    let path = p.join(...prefixes, name)
-    let ret = storage(path, opts)
-    return ret
-  }
 }
