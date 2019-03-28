@@ -1,15 +1,10 @@
 const p = require('path')
 
-const fs = require('fs-extra')
 const level = require('level')
 const sub = require('subleveldown')
 const prefixer = require('sublevel-prefixer')
-const hypercore = require('hypercore')
 const crypto = require('hypercore/lib/crypto')
 const datEncoding = require('dat-encoding')
-const mkdirp = require('mkdirp')
-
-const Replicator = require('./lib/replicator.js')
 const messages = require('./lib/messages.js')
 
 const KEY_PREFIX = 'key'
@@ -19,16 +14,51 @@ const prefix = prefixer()
 
 module.exports = Corestore
 
+// Default handlers.
+const mkdirp = require('mkdirp')
+const fs = require('fs-extra')
+const Replicator = require('./lib/replicator.js')
+const Hypercore = require('hypercore')
+
+async function defaultPrepare (path, cb) {
+  return new Promise((resolve, reject) => {
+    mkdirp(path, err => err ? reject(err) : resolve())
+  })
+}
+
+async function defaultDelete (path) {
+  await fs.remove(path)
+}
+
+function defaultReplicator (store, opts) {
+  return Replicator(store, opts)
+}
+
+function defaultFactory (path, key, opts) {
+  return Hypercore(path, key, opts)
+}
+
 function Corestore (dir, opts = {}) {
   if (!(this instanceof Corestore)) return new Corestore(dir, opts)
+  if (typeof dir === 'object') return Corestore(null, dir)
   this._opts = opts
 
   this.dir = dir
   this._root = p.join(dir, 'cores')
   this._opened = false
 
+  // Default: mkdirp
+  this._prepare = opts.prepare || defaultPrepare
+  // Default: fs.remove
+  this._delete = opts.delete || defaultDelete
+
+  // Default: hypercore
+  this.factory = opts.factory || defaultFactory
+
+  // Default: discovery-swarm replicator
   if (!(opts.network && opts.network.disable)) {
-    this._replicator = Replicator(this, opts.network)
+    const replicator = opts.replicator || defaultReplicator
+    this._replicator = replicator(this, opts.network)
   } else {
     this._noNetwork = true
   }
@@ -43,27 +73,25 @@ function Corestore (dir, opts = {}) {
   this.coresByDKey = new Map()
 
   this._ready = new Promise(async (resolve, reject) => {
-    mkdirp(dir, async err => {
-      if (err) return reject(err)
+    await this._prepare(dir)
 
-      this._metadata = level(p.join(dir, 'metadata'), {
-        keyEncoding: 'utf-8',
-        valueEncoding: 'binary'
-      })
-      this._metadataByName = sub(this._metadata, NAME_PREFIX, { valueEncoding: 'binary' })
-      this._metadataByDKey = sub(this._metadata, DKEY_PREFIX, { valueEncoding: 'binary' })
-      this._metadataByKey = sub(this._metadata, KEY_PREFIX, { valueEncoding: 'binary' })
-
-      try {
-        if (!(opts.network && opts.network.disable)) {
-          await this._seedAllCores()
-        }
-      } catch (err) {
-        return reject(err)
-      }
-      this._opened = true
-      return resolve()
+    this._metadata = level(p.join(dir, 'metadata'), {
+      keyEncoding: 'utf-8',
+      valueEncoding: 'binary'
     })
+    this._metadataByName = sub(this._metadata, NAME_PREFIX, { valueEncoding: 'binary' })
+    this._metadataByDKey = sub(this._metadata, DKEY_PREFIX, { valueEncoding: 'binary' })
+    this._metadataByKey = sub(this._metadata, KEY_PREFIX, { valueEncoding: 'binary' })
+
+    try {
+      if (!(opts.network && opts.network.disable)) {
+        await this._seedAllCores()
+      }
+    } catch (err) {
+      return reject(err)
+    }
+    this._opened = true
+    return resolve()
   })
 
   this.ready = cb => {
@@ -116,7 +144,7 @@ Corestore.prototype._seedAllCores = async function () {
 Corestore.prototype._create = function (key, opts = {}) {
   let keyString = ensureString(key)
 
-  let core = hypercore(this._path(keyString), key, opts)
+  let core = this.factory(this._path(keyString), key, opts)
   core.on('close', () => {
     this._removeCachedCore(core)
     this._unseed(core)
@@ -279,7 +307,7 @@ Corestore.prototype.delete = async function (key) {
         ]
         if (info.name) batch.push({ type: 'del', key: prefix(NAME_PREFIX, info.name) })
         await this._metadata.batch(batch)
-        await fs.remove(this._path(key))
+        await this._delete(this._path(key))
         this._removeCachedCore(core)
 
         return resolve()
