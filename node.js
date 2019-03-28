@@ -5,6 +5,7 @@ const fs = require('fs-extra')
 const discoverySwarm = require('discovery-swarm')
 const swarmDefaults = require('dat-swarm-defaults')
 const p = require('path')
+const level = require('level')
 
 const storage = {
   create (path) {
@@ -33,7 +34,7 @@ function swarm (opts) {
   return swarm
 }
 
-module.exports = require('./index.js').withDefaults({ storage, swarm })
+module.exports = require('./index.js').withDefaults({ storage, swarm, level })
 
 function defaultTrue (x) {
   return x === undefined ? true : x

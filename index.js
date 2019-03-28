@@ -1,6 +1,5 @@
 const p = require('path')
 
-const level = require('level')
 const sub = require('subleveldown')
 const prefixer = require('sublevel-prefixer')
 const crypto = require('hypercore/lib/crypto')
@@ -35,7 +34,8 @@ function Corestore (dir, opts = {}) {
   this._root = p.join(dir, 'cores')
   this._opened = false
 
-  this.level = opts.level || level
+  if (!opts.level) throw new Error('level is required')
+  this.level = opts.level
 
   // Default: hypercore
   this.factory = opts.factory || defaultFactory
