@@ -15,19 +15,25 @@ const prefix = prefixer()
 module.exports = Corestore
 
 // Default handlers.
-const mkdirp = require('mkdirp')
-const fs = require('fs-extra')
 const Replicator = require('./lib/replicator.js')
 const Hypercore = require('hypercore')
 
-async function defaultPrepare (path, cb) {
-  return new Promise((resolve, reject) => {
-    mkdirp(path, err => err ? reject(err) : resolve())
-  })
-}
+const raf = require('random-access-file')
+const mkdirp = require('mkdirp')
+const fs = require('fs-extra')
 
-async function defaultDelete (path) {
-  await fs.remove(path)
+const defaultStorage = {
+  storage (path) {
+    return nestStorage(raf, path)
+  },
+  async prepare (path) {
+    return new Promise((resolve, reject) => {
+      mkdirp(path, err => err ? reject(err) : resolve())
+    })
+  },
+  async delete (path) {
+    return fs.remove(path)
+  }
 }
 
 function defaultReplicator (store, opts) {
@@ -35,25 +41,28 @@ function defaultReplicator (store, opts) {
 }
 
 function defaultFactory (path, key, opts) {
-  return Hypercore(path, key, opts)
+  const storage = opts.storage || defaultStorage(path)
+  return Hypercore(storage, key, opts)
 }
 
 function Corestore (dir, opts = {}) {
-  if (!(this instanceof Corestore)) return new Corestore(dir, opts)
   if (typeof dir === 'object') return Corestore(null, dir)
+  if (!(this instanceof Corestore)) return new Corestore(dir, opts)
   this._opts = opts
 
   this.dir = dir
   this._root = p.join(dir, 'cores')
   this._opened = false
 
-  // Default: mkdirp
-  this._prepare = opts.prepare || defaultPrepare
-  // Default: fs.remove
-  this._delete = opts.delete || defaultDelete
+  this.level = opts.level || level
 
   // Default: hypercore
   this.factory = opts.factory || defaultFactory
+
+  // Default: random-access-file
+  this._storageHandlers = opts.storage ? wrapStorage(opts.storage) : defaultStorage
+
+  this.storage = this._storageHandlers.storage
 
   // Default: discovery-swarm replicator
   if (!(opts.network && opts.network.disable)) {
@@ -73,9 +82,11 @@ function Corestore (dir, opts = {}) {
   this.coresByDKey = new Map()
 
   this._ready = new Promise(async (resolve, reject) => {
-    await this._prepare(dir)
+    if (this._storageHandlers.prepare) {
+      await this._storageHandlers.prepare(dir)
+    }
 
-    this._metadata = level(p.join(dir, 'metadata'), {
+    this._metadata = this.level(p.join(dir, 'metadata'), {
       keyEncoding: 'utf-8',
       valueEncoding: 'binary'
     })
@@ -144,7 +155,10 @@ Corestore.prototype._seedAllCores = async function () {
 Corestore.prototype._create = function (key, opts = {}) {
   let keyString = ensureString(key)
 
-  let core = this.factory(this._path(keyString), key, opts)
+  // Assign global storage by default.
+  opts.storage = opts.storage || this.storage
+
+  let core = this.factory(this._path(keyString), key, opts, this)
   core.on('close', () => {
     this._removeCachedCore(core)
     this._unseed(core)
@@ -307,7 +321,11 @@ Corestore.prototype.delete = async function (key) {
         ]
         if (info.name) batch.push({ type: 'del', key: prefix(NAME_PREFIX, info.name) })
         await this._metadata.batch(batch)
-        await this._delete(this._path(key))
+
+        if (this._storageHandlers.delete) {
+          await this._storageHandlers.delete(this._path(key))
+        }
+
         this._removeCachedCore(core)
 
         return resolve()
@@ -344,4 +362,18 @@ Corestore.prototype.close = async function () {
 
 function ensureString (key) {
   return datEncoding.toStr(key)
+}
+
+function wrapStorage (storage) {
+  if (typeof storage === 'object') return storage
+  if (typeof storage === 'function') return { storage }
+  throw new Error('Storage should be a function or a string.')
+}
+
+function nestStorage (storage, ...prefixes) {
+  return function (name, opts) {
+    let path = p.join(...prefixes, name)
+    let ret = storage(path, opts)
+    return ret
+  }
 }

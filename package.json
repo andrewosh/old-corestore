@@ -37,6 +37,7 @@
     "level": "^4.0.0",
     "lru": "^3.1.0",
     "mutexify": "^1.2.0",
+    "random-access-file": "^2.1.0",
     "sublevel-prefixer": "^1.0.0",
     "subleveldown": "^3.0.1"
   }
