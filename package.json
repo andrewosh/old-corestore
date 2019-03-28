@@ -34,13 +34,16 @@
     "dat-swarm-defaults": "^1.0.1",
     "debug": "^3.1.0",
     "discovery-swarm": "^5.1.1",
+    "discovery-swarm-web": "^1.0.5",
     "fs-extra": "^6.0.1",
     "hypercore": "^6.25.0",
     "hypercore-protocol": "^6.6.4",
     "level": "^4.0.0",
+    "level-browserify": "^2.0.0",
     "lru": "^3.1.0",
     "mutexify": "^1.2.0",
     "random-access-file": "^2.1.0",
+    "random-access-web": "^2.0.1",
     "sublevel-prefixer": "^1.0.0",
     "subleveldown": "^3.0.1"
   }
