@@ -139,45 +139,49 @@ Corestore.prototype._create = function (key, opts = {}) {
   // Assign global storage by default.
   opts.storage = opts.storage || this.storage
 
-  let core = this.factory(this._path(keyString), key, opts, this)
+  let core = this.factory(this._path(keyString), key, opts)
+
   core.on('close', () => {
     this._removeCachedCore(core)
     this._unseed(core)
   })
+
   let ready = core.ready.bind(core)
+  let promise = new Promise((resolve, reject) => {
+    ready(err => {
+      if (err) return reject(err)
+
+      let dKey = ensureString(core.discoveryKey)
+      let key = ensureString(core.key)
+      this._cacheCore(core)
+
+      opts.key = core.key
+      opts.discoveryKey = core.discoveryKey
+      let info = messages.Core.encode(opts)
+
+      let batch = [
+        { type: 'put', key: prefix(KEY_PREFIX, key), value: info },
+        { type: 'put', key: prefix(DKEY_PREFIX, dKey), value: key }
+      ]
+      if (opts.name) batch.push({ type: 'put', key: prefix(NAME_PREFIX, opts.name), value: key })
+
+      this._metadata.batch(batch, err => {
+        if (err) return reject(err)
+        if (opts.seed) {
+          this._seed(core)
+        }
+        return resolve()
+      })
+    })
+  })
 
   core.ready = (cb) => {
-    return new Promise((resolve, reject) => {
-      ready(err => {
-        if (err) return reject(err)
-
-        let dKey = ensureString(core.discoveryKey)
-        let key = ensureString(core.key)
-        this._cacheCore(core)
-
-        opts.key = core.key
-        opts.discoveryKey = core.discoveryKey
-        let info = messages.Core.encode(opts)
-
-        let batch = [
-          { type: 'put', key: prefix(KEY_PREFIX, key), value: info },
-          { type: 'put', key: prefix(DKEY_PREFIX, dKey), value: key }
-        ]
-        if (opts.name) batch.push({ type: 'put', key: prefix(NAME_PREFIX, opts.name), value: key })
-
-        this._metadata.batch(batch, err => {
-          if (err) return reject(err)
-          if (opts.seed) {
-            this._seed(core)
-          }
-          return resolve()
-        })
+    return promise
+      .then(() => {
+        if (cb) return cb()
+      }).catch(err => {
+        if (cb) return cb(err)
       })
-    }).then(() => {
-      if (cb) return cb()
-    }).catch(err => {
-      if (cb) return cb(err)
-    })
   }
 
   return core
