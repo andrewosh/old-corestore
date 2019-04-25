@@ -1,5 +1,5 @@
 {
-  "name": "corestore",
+  "name": "@Frando/corestore",
   "version": "1.2.2",
   "description": "Yet another hypercore manager, but this time with permissioned access to 'cores",
   "main": "node.js",
