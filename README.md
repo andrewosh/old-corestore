@@ -1,4 +1,4 @@
-# @Frando/corestore
+# @frando/corestore
 
 > Experimental fork of [@andrewosh/corestore](https://github.com/andrewosh/corestore):
 > 
@@ -12,7 +12,7 @@ Networking code lightly modified from [Beaker's implementation](https://github.c
 
 ## Installation
 ```
-npm i @Frando/corestore --save
+npm i @frando/corestore --save
 ```
 
 ## Example

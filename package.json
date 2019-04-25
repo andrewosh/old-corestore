@@ -1,5 +1,5 @@
 {
-  "name": "@Frando/corestore",
+  "name": "@frando/corestore",
   "version": "1.2.2",
   "description": "Yet another hypercore manager, but this time with permissioned access to 'cores",
   "main": "node.js",
@@ -7,6 +7,9 @@
   "scripts": {
     "test": "standard && tape test/*.js",
     "example": "cd example; npm install && npm run dev"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "repository": {
     "type": "git",
