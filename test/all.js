@@ -4,7 +4,13 @@ const fs = require('fs-extra')
 const test = require('tape')
 const mkdirp = require('mkdirp')
 
-const Store = require('..')
+const {
+  cleanup,
+  create,
+  append,
+  get,
+  close
+} = require('./helpers/core.js')
 
 const TEST_DIR = p.join(__dirname, 'test-storage')
 let idx = 0
@@ -17,7 +23,7 @@ test('setup', t => {
 test('can create and get info for a core', async t => {
   let s = await create(idx++)
 
-  let core = s.get()
+  let core = await await s.get()
   await core.ready()
 
   let info = await s.info(core.key)
@@ -31,7 +37,7 @@ test('can create and get info for a core', async t => {
 test('can create and get info for a core, across restarts', async t => {
   let s = await create(idx)
 
-  let core = s.get()
+  let core = await await s.get()
   await core.ready()
 
   await s.close()
@@ -49,11 +55,11 @@ test('can create and replicate a core', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = s1.get({ valueEncoding: 'utf-8' })
+  let core1 = await await s1.get({ valueEncoding: 'utf-8' })
   await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = await await s2.get(core1.key, { valueEncoding: 'utf-8' })
   await core2.ready()
   let block = await get(core2, 0)
 
@@ -73,10 +79,10 @@ test('can create a core that isnt replicating', async t => {
   })
   let s2 = await create(idx++)
 
-  let core1 = s1.get()
+  let core1 = await await s1.get()
   await core1.ready()
 
-  let core2 = s2.get(core1.key)
+  let core2 = await await s2.get(core1.key)
   await core2.ready()
 
   t.same(core2.key, core1.key)
@@ -88,11 +94,11 @@ test('should not seed if seed is false', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = s1.get({ valueEncoding: 'utf-8', seed: false })
+  let core1 = await await s1.get({ valueEncoding: 'utf-8', seed: false })
   await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = await await s2.get(core1.key, { valueEncoding: 'utf-8' })
   await core2.ready()
 
   // Delay for peer discovery.
@@ -107,11 +113,11 @@ test('should stop seeding', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = s1.get({ valueEncoding: 'utf-8' })
+  let core1 = await await s1.get({ valueEncoding: 'utf-8' })
   await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = await await s2.get(core1.key, { valueEncoding: 'utf-8' })
   await core2.ready()
   let value = await get(core2, 0)
 
@@ -131,11 +137,11 @@ test('should delete and unseed', async t => {
   let s1 = await create(idx++)
   let s2 = await create(idx++)
 
-  let core1 = s1.get({ valueEncoding: 'utf-8' })
+  let core1 = await s1.get({ valueEncoding: 'utf-8' })
   await core1.ready()
   await append(core1, 'hello!')
 
-  let core2 = s2.get(core1.key, { valueEncoding: 'utf-8' })
+  let core2 = await s2.get(core1.key, { valueEncoding: 'utf-8' })
   await core2.ready()
   let value = await get(core2, 0)
 
@@ -160,7 +166,7 @@ test('should work without networking', async t => {
     }
   })
 
-  let core = s.get()
+  let core = await s.get()
   await core.ready()
 
   let info = await s.info(core.key)
@@ -178,9 +184,9 @@ test('should list all cores', async t => {
     }
   })
 
-  let core1 = s.get()
-  let core2 = s.get()
-  let core3 = s.get()
+  let core1 = await s.get()
+  let core2 = await s.get()
+  let core3 = await s.get()
   await Promise.all([core1.ready(), core2.ready(), core3.ready()])
 
   let l = await s.list()
@@ -200,13 +206,13 @@ test('should get a core by name', async t => {
     }
   })
 
-  let core = s.get({ name: 'hello' })
+  let core = await s.get({ name: 'hello' })
   await core.ready()
 
   let info = await s.info('hello', { name: true })
   t.same(info.name, 'hello')
 
-  let core2 = await s.getByName('hello')
+  let core2 = await await s.getByName('hello')
   t.true(core2.key.equals(core.key))
 
   await cleanup(s)
@@ -220,11 +226,11 @@ test('should delete both records for a named core', async t => {
     }
   })
 
-  let core = s.get({ name: 'hello' })
+  let core = await s.get({ name: 'hello' })
   await core.ready()
 
   await s.delete(core.key)
-  let key = await s.getByName('hello')
+  let key = await await s.getByName('hello')
   t.false(key)
 
   await cleanup(s)
@@ -237,7 +243,7 @@ test('should seed stored keys without inflating cores', async t => {
   let keys = []
 
   for (let i = 0; i < 10; i++) {
-    let core = s1.get()
+    let core = await s1.get()
     await core.ready()
     await append(core, core.key)
     keys.push(core.key)
@@ -251,7 +257,7 @@ test('should seed stored keys without inflating cores', async t => {
 
   let s2 = await create(idx++)
   for (let i = 0; i < keys.length; i++) {
-    let core = s2.get(keys[i])
+    let core = await s2.get(keys[i])
     await core.ready()
     let val = await get(core, 0)
     t.same(val, keys[i])
@@ -266,48 +272,3 @@ test('teardown', t => {
   fs.remove(TEST_DIR)
   t.end()
 })
-
-async function cleanup () {
-  for (var i = 0; i < arguments.length; i++) {
-    let store = arguments[i]
-    await store.close()
-    await fs.remove(store.dir)
-  }
-}
-
-async function create (idx, opts) {
-  opts = {
-    network: { port: 4000 + idx },
-    ...opts
-  }
-  let store = Store(p.join(TEST_DIR, `s${idx}`), opts)
-  await store.ready()
-  return store
-}
-
-async function append (core, val) {
-  return new Promise((resolve, reject) => {
-    core.append(val, err => {
-      if (err) return reject(err)
-      return resolve()
-    })
-  })
-}
-
-async function get (core, idx) {
-  return new Promise((resolve, reject) => {
-    core.get(idx, (err, value) => {
-      if (err) return reject(err)
-      return resolve(value)
-    })
-  })
-}
-
-async function close (core) {
-  return new Promise((resolve, reject) => {
-    core.close(err => {
-      if (err) return reject(err)
-      return resolve()
-    })
-  })
-}
