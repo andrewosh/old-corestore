@@ -133,13 +133,13 @@ Corestore.prototype._seedAllCores = async function () {
   })
 }
 
-Corestore.prototype._create = function (key, opts = {}) {
+Corestore.prototype._create = async function (key, opts = {}) {
   let keyString = ensureString(key)
 
   // Assign global storage by default.
   opts.storage = opts.storage || this.storage
 
-  let core = this.factory(this._path(keyString), key, opts)
+  let core = await this.factory(this._path(keyString), key, opts, this)
 
   core.on('close', () => {
     this._removeCachedCore(core)
@@ -209,7 +209,7 @@ Corestore.prototype._getSeedCore = async function (dKey, opts) {
   let core = this._getCachedCore(info.key)
   if (core) return core
 
-  core = this.get(info.key, opts)
+  core = await this.get(info.key, opts)
   await core.ready()
   return core
 }
@@ -232,7 +232,7 @@ Corestore.prototype.info = async function (key, opts = {}) {
   }
 }
 
-Corestore.prototype.get = function (key, opts) {
+Corestore.prototype.get = async function (key, opts) {
   if (typeof key === 'object' && !(key instanceof Buffer)) {
     opts = key
     key = null
@@ -252,7 +252,7 @@ Corestore.prototype.get = function (key, opts) {
     key = publicKey
   }
 
-  let core = this._create(key, opts)
+  let core = await this._create(key, opts)
 
   opts.writable = core.writable
 
@@ -263,7 +263,7 @@ Corestore.prototype.getByName = async function (name, opts) {
   let info = await this.info(name, { name: true })
   if (!info) return null
 
-  let core = this.get(info.key, opts)
+  let core = await this.get(info.key, opts)
   await core.ready()
   return core
 }
@@ -289,7 +289,7 @@ Corestore.prototype.delete = async function (key) {
   let info = await this.info(key)
 
   if (!info) throw new Error('Cannot delete a nonexistent core')
-  let core = this.get(key)
+  let core = await this.get(key)
 
   if (info.seed && !this._noNetwork) {
     await this._unseed(core)
