@@ -8,14 +8,13 @@ const datEncoding = require('dat-encoding')
 const messages = require('./lib/messages.js')
 const Replicator = require('./lib/replicator.js')
 
+const DEFAULT_TYPE = 'hypercore'
+const DEFAULT_FACTORIES = { hypercore }
+
 const KEY_PREFIX = 'key'
 const DKEY_PREFIX = 'dkey'
 const NAME_PREFIX = 'name'
 const prefix = prefixer()
-
-function defaultFactory (path, key, opts) {
-  return hypercore(opts.storage(path), key, opts)
-}
 
 module.exports = Corestore
 
@@ -39,6 +38,7 @@ function Corestore (dir, opts = {}) {
 
   // Default: hypercore
   this.factory = opts.factory || defaultFactory
+  this.factories = opts.factories || DEFAULT_FACTORIES
 
   // Default: random-access-file
   if (!opts.storage) throw new Error('storage is required')
@@ -343,6 +343,26 @@ Corestore.prototype.close = async function () {
   let tasks = [self._metadata.close()]
   if (self._replicator) tasks.push(self._replicator.stop())
   return Promise.all(tasks)
+}
+
+async function defaultFactory (path, key, opts, store) {
+  if (key && !opts.type) {
+    let info = await store.info(key)
+    if (info && info.type) {
+      opts.type = info.type
+    }
+  }
+
+  if (!opts.type) {
+    opts.type = DEFAULT_TYPE
+  }
+
+  if (!store.factories[opts.type]) {
+    throw new Error(`Unsupported type: ${opts.type}`)
+  }
+
+  const factory = store.factories[opts.type]
+  return factory(opts.storage(path), key, opts)
 }
 
 function ensureString (key) {
