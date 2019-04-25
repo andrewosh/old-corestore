@@ -68,11 +68,11 @@ function Corestore (dir, opts = {}) {
     }
 
     this._metadata = this.level(p.join(dir, 'metadata'), {
-      keyEncoding: 'utf-8',
+      keyEncoding: 'utf8',
       valueEncoding: 'binary'
     })
-    this._metadataByName = sub(this._metadata, NAME_PREFIX, { valueEncoding: 'binary' })
-    this._metadataByDKey = sub(this._metadata, DKEY_PREFIX, { valueEncoding: 'binary' })
+    this._metadataByName = sub(this._metadata, NAME_PREFIX, { valueEncoding: 'utf8' })
+    this._metadataByDKey = sub(this._metadata, DKEY_PREFIX, { valueEncoding: 'utf8' })
     this._metadataByKey = sub(this._metadata, KEY_PREFIX, { valueEncoding: 'binary' })
 
     try {
