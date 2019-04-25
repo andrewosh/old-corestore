@@ -1,11 +1,11 @@
 // Default handlers.
 const raf = require('random-access-file')
 const mkdirp = require('mkdirp')
-const fs = require('fs-extra')
 const discoverySwarm = require('discovery-swarm')
 const swarmDefaults = require('dat-swarm-defaults')
 const p = require('path')
 const level = require('level')
+const Corestore = require('./index.js')
 
 const storage = {
   create (path) {
@@ -17,7 +17,8 @@ const storage = {
     })
   },
   delete (path) {
-    return fs.remove(path)
+    // left out for now.
+    // return fs.remove(path)
   }
 }
 
@@ -30,11 +31,16 @@ function swarm (opts) {
     dht: defaultTrue(opts.dht),
     stream: opts.stream
   }))
-  swarm.listen(opts.port || 3005)
+  swarm.listen(opts.port || undefined)
   return swarm
 }
 
-module.exports = require('./index.js').withDefaults({ storage, swarm, level })
+const defaultOpts = { storage, swarm, level }
+
+const NodeCorestore = Corestore.withDefaults(defaultOpts)
+NodeCorestore.defaultOpts = defaultOpts
+
+module.exports = NodeCorestore
 
 function defaultTrue (x) {
   return x === undefined ? true : x
