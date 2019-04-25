@@ -9,4 +9,5 @@ message Core {
   optional string description = 7;
   optional bytes prefetch = 8;
   optional bytes discoveryKey = 9;
+  optional string type = 10;
 }
