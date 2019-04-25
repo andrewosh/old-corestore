@@ -346,7 +346,9 @@ Corestore.prototype.close = async function () {
 }
 
 function ensureString (key) {
-  return datEncoding.toStr(key)
+  if (typeof key === 'string') return key
+  let res = datEncoding.toStr(key)
+  return res
 }
 
 function wrapStorage (storage) {
