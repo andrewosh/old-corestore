@@ -1,0 +1,28 @@
+{
+ "name": "corestore-example-choo",
+ "version": "1.0.0",
+ "description": "",
+ "main": "browser.js",
+ "private": true,
+ "scripts": {
+  "watch": "watchify browser.js --debug -o bundle.js -v",
+  "dss": "../node_modules/.bin/discovery-swarm-web",
+  "server": "http-server .",
+  "server2": "http-server -p 8081 .",
+  "dev": "run-p watch dss server server2",
+  "build": "browserify browser.js -p tinyify > bundle.js"
+ },
+ "author": "Franz Heinzmann (Frando)",
+ "license": "GPL-3.0",
+ "dependencies": {
+  "choo": "^6.13.1"
+ },
+ "devDependencies": {
+  "browserify": "^16.2.3",
+  "http-server": "^0.11.1",
+  "hyperdrive": "^10.0.0-rc3",
+  "npm-run-all": "^4.1.5",
+  "tinyify": "^2.5.0",
+  "watchify": "^3.11.1"
+ }
+}

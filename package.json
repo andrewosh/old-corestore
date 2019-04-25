@@ -5,7 +5,8 @@
   "main": "node.js",
   "browser": "browser.js",
   "scripts": {
-    "test": "standard && tape test/*.js"
+    "test": "standard && tape test/*.js",
+    "example": "cd example; npm install && npm run dev"
   },
   "repository": {
     "type": "git",
