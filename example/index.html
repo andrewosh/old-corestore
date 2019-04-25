@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='UTF-8'/>
+    <title>corestore example</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <style type="text/css">
+      h1 {
+        margin: 0 2rem;
+        padding: 0;
+      }
+      body {
+        font-family: sans-serif;
+      }
+      .core-list {
+        margin: 1rem 0;
+        padding: 0;
+      }
+      .core-list li {
+        list-style-type: none;
+      }
+      .core-list li.active a,
+      .core-list li a:hover {
+        background: #ccc;
+      }
+      .core-list li a {
+        text-decoration: none;
+        display: block;
+        padding: 5px;
+        color: #000;
+      }
+      .core-select, .core-view {
+        margin: 0 2rem;
+      }
+      @media (min-width: 1000px) {
+        main {
+          display: flex;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id='root'></div>
+    <script type="text/javascript" src='bundle.js'></script>
+  </body>
+</html>`

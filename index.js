@@ -1,16 +1,15 @@
 const p = require('path')
 
-const fs = require('fs-extra')
-const level = require('level')
 const sub = require('subleveldown')
 const prefixer = require('sublevel-prefixer')
-const hypercore = require('hypercore')
 const crypto = require('hypercore/lib/crypto')
+const hypercore = require('hypercore')
 const datEncoding = require('dat-encoding')
-const mkdirp = require('mkdirp')
-
-const Replicator = require('./lib/replicator.js')
 const messages = require('./lib/messages.js')
+const Replicator = require('./lib/replicator.js')
+
+const DEFAULT_TYPE = 'hypercore'
+const DEFAULT_FACTORIES = { hypercore }
 
 const KEY_PREFIX = 'key'
 const DKEY_PREFIX = 'dkey'
@@ -19,7 +18,14 @@ const prefix = prefixer()
 
 module.exports = Corestore
 
+Corestore.withDefaults = function (defaultOpts) {
+  return function (dir, opts) {
+    return Corestore(dir, { ...defaultOpts, ...opts })
+  }
+}
+
 function Corestore (dir, opts = {}) {
+  if (typeof dir === 'object') return Corestore(null, dir)
   if (!(this instanceof Corestore)) return new Corestore(dir, opts)
   this._opts = opts
 
@@ -27,8 +33,22 @@ function Corestore (dir, opts = {}) {
   this._root = p.join(dir, 'cores')
   this._opened = false
 
+  if (!opts.level) throw new Error('level is required')
+  this.level = opts.level
+
+  // Default: hypercore
+  this.factory = opts.factory || defaultFactory
+  this.factories = opts.factories || DEFAULT_FACTORIES
+
+  // Default: random-access-file
+  if (!opts.storage) throw new Error('storage is required')
+  this._storageHandlers = wrapStorage(opts.storage)
+  this.storage = this._storageHandlers.create
+
+  // Default: discovery-swarm replicator
   if (!(opts.network && opts.network.disable)) {
-    this._replicator = Replicator(this, opts.network)
+    if (!opts.swarm) throw new Error('swarm is required if network is not disabled')
+    this._replicator = Replicator(this, opts.swarm, opts.network)
   } else {
     this._noNetwork = true
   }
@@ -43,27 +63,27 @@ function Corestore (dir, opts = {}) {
   this.coresByDKey = new Map()
 
   this._ready = new Promise(async (resolve, reject) => {
-    mkdirp(dir, async err => {
-      if (err) return reject(err)
+    if (this._storageHandlers.prepare) {
+      await this._storageHandlers.prepare(dir)
+    }
 
-      this._metadata = level(p.join(dir, 'metadata'), {
-        keyEncoding: 'utf-8',
-        valueEncoding: 'binary'
-      })
-      this._metadataByName = sub(this._metadata, NAME_PREFIX, { valueEncoding: 'binary' })
-      this._metadataByDKey = sub(this._metadata, DKEY_PREFIX, { valueEncoding: 'binary' })
-      this._metadataByKey = sub(this._metadata, KEY_PREFIX, { valueEncoding: 'binary' })
-
-      try {
-        if (!(opts.network && opts.network.disable)) {
-          await this._seedAllCores()
-        }
-      } catch (err) {
-        return reject(err)
-      }
-      this._opened = true
-      return resolve()
+    this._metadata = this.level(p.join(dir, 'metadata'), {
+      keyEncoding: 'utf8',
+      valueEncoding: 'binary'
     })
+    this._metadataByName = sub(this._metadata, NAME_PREFIX, { valueEncoding: 'utf8' })
+    this._metadataByDKey = sub(this._metadata, DKEY_PREFIX, { valueEncoding: 'utf8' })
+    this._metadataByKey = sub(this._metadata, KEY_PREFIX, { valueEncoding: 'binary' })
+
+    try {
+      if (!(opts.network && opts.network.disable)) {
+        await this._seedAllCores()
+      }
+    } catch (err) {
+      return reject(err)
+    }
+    this._opened = true
+    return resolve()
   })
 
   this.ready = cb => {
@@ -113,48 +133,55 @@ Corestore.prototype._seedAllCores = async function () {
   })
 }
 
-Corestore.prototype._create = function (key, opts = {}) {
+Corestore.prototype._create = async function (key, opts = {}) {
   let keyString = ensureString(key)
 
-  let core = hypercore(this._path(keyString), key, opts)
+  // Assign global storage by default.
+  opts.storage = opts.storage || this.storage
+
+  let core = await this.factory(this._path(keyString), key, opts, this)
+
   core.on('close', () => {
     this._removeCachedCore(core)
     this._unseed(core)
   })
+
   let ready = core.ready.bind(core)
+  let promise = new Promise((resolve, reject) => {
+    ready(err => {
+      if (err) return reject(err)
+
+      let dKey = ensureString(core.discoveryKey)
+      let key = ensureString(core.key)
+      this._cacheCore(core)
+
+      opts.key = core.key
+      opts.discoveryKey = core.discoveryKey
+      let info = messages.Core.encode(opts)
+
+      let batch = [
+        { type: 'put', key: prefix(KEY_PREFIX, key), value: info },
+        { type: 'put', key: prefix(DKEY_PREFIX, dKey), value: key }
+      ]
+      if (opts.name) batch.push({ type: 'put', key: prefix(NAME_PREFIX, opts.name), value: key })
+
+      this._metadata.batch(batch, err => {
+        if (err) return reject(err)
+        if (opts.seed) {
+          this._seed(core)
+        }
+        return resolve()
+      })
+    })
+  })
 
   core.ready = (cb) => {
-    return new Promise((resolve, reject) => {
-      ready(err => {
-        if (err) return reject(err)
-
-        let dKey = ensureString(core.discoveryKey)
-        let key = ensureString(core.key)
-        this._cacheCore(core)
-
-        opts.key = core.key
-        opts.discoveryKey = core.discoveryKey
-        let info = messages.Core.encode(opts)
-
-        let batch = [
-          { type: 'put', key: prefix(KEY_PREFIX, key), value: info },
-          { type: 'put', key: prefix(DKEY_PREFIX, dKey), value: key }
-        ]
-        if (opts.name) batch.push({ type: 'put', key: prefix(NAME_PREFIX, opts.name), value: key })
-
-        this._metadata.batch(batch, err => {
-          if (err) return reject(err)
-          if (opts.seed) {
-            this._seed(core)
-          }
-          return resolve()
-        })
+    return promise
+      .then(() => {
+        if (cb) return cb()
+      }).catch(err => {
+        if (cb) return cb(err)
       })
-    }).then(() => {
-      if (cb) return cb()
-    }).catch(err => {
-      if (cb) return cb(err)
-    })
   }
 
   return core
@@ -182,7 +209,7 @@ Corestore.prototype._getSeedCore = async function (dKey, opts) {
   let core = this._getCachedCore(info.key)
   if (core) return core
 
-  core = this.get(info.key, opts)
+  core = await this.get(info.key, opts)
   await core.ready()
   return core
 }
@@ -205,7 +232,7 @@ Corestore.prototype.info = async function (key, opts = {}) {
   }
 }
 
-Corestore.prototype.get = function (key, opts) {
+Corestore.prototype.get = async function (key, opts) {
   if (typeof key === 'object' && !(key instanceof Buffer)) {
     opts = key
     key = null
@@ -225,7 +252,7 @@ Corestore.prototype.get = function (key, opts) {
     key = publicKey
   }
 
-  let core = this._create(key, opts)
+  let core = await this._create(key, opts)
 
   opts.writable = core.writable
 
@@ -236,7 +263,7 @@ Corestore.prototype.getByName = async function (name, opts) {
   let info = await this.info(name, { name: true })
   if (!info) return null
 
-  let core = this.get(info.key, opts)
+  let core = await this.get(info.key, opts)
   await core.ready()
   return core
 }
@@ -262,7 +289,7 @@ Corestore.prototype.delete = async function (key) {
   let info = await this.info(key)
 
   if (!info) throw new Error('Cannot delete a nonexistent core')
-  let core = this.get(key)
+  let core = await this.get(key)
 
   if (info.seed && !this._noNetwork) {
     await this._unseed(core)
@@ -279,7 +306,11 @@ Corestore.prototype.delete = async function (key) {
         ]
         if (info.name) batch.push({ type: 'del', key: prefix(NAME_PREFIX, info.name) })
         await this._metadata.batch(batch)
-        await fs.remove(this._path(key))
+
+        if (this._storageHandlers.delete) {
+          await this._storageHandlers.delete(this._path(key))
+        }
+
         this._removeCachedCore(core)
 
         return resolve()
@@ -314,6 +345,34 @@ Corestore.prototype.close = async function () {
   return Promise.all(tasks)
 }
 
+async function defaultFactory (path, key, opts, store) {
+  if (key && !opts.type) {
+    let info = await store.info(key)
+    if (info && info.type) {
+      opts.type = info.type
+    }
+  }
+
+  if (!opts.type) {
+    opts.type = DEFAULT_TYPE
+  }
+
+  if (!store.factories[opts.type]) {
+    throw new Error(`Unsupported type: ${opts.type}`)
+  }
+
+  const factory = store.factories[opts.type]
+  return factory(opts.storage(path), key, opts)
+}
+
 function ensureString (key) {
-  return datEncoding.toStr(key)
+  if (typeof key === 'string') return key
+  let res = datEncoding.toStr(key)
+  return res
+}
+
+function wrapStorage (storage) {
+  if (typeof storage === 'object') return storage
+  if (typeof storage === 'function') return { create: storage }
+  throw new Error('Storage should be a function or a string.')
 }
