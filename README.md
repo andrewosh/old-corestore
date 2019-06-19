@@ -1,6 +1,8 @@
 # corestore
 [![Build Status](https://travis-ci.org/andrewosh/corestore.svg?branch=master)](https://travis-ci.org/andrewosh/corestore)
 
+__Note: This module is being deprecated and the "corestore" name is being repurposed. Check out [corestore](https://github.com/andrewosh/random-access-corestore) and [megastore](https://github.com/andrewosh/megastore) for more info.__
+
 Manages and seeds a library of Hypercores.
 
 Networking code lightly modified from [Beaker's implementation](https://github.com/beakerbrowser/beaker-core/blob/master/dat/daemon/index.js)
