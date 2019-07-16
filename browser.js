@@ -14,7 +14,7 @@ const storage = {
 }
 
 function swarm (opts) {
-  const swarm = new DiscoverySwarmWeb({
+  const swarm = DiscoverySwarmWeb({
     ...opts,
     stream: opts.stream
   })
